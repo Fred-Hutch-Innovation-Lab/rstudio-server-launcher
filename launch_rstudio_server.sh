@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #SBATCH --job-name=rstudio-server
 #SBATCH --time=4-00:00:00   # days-hours:minutes:seconds
 #SBATCH --ntasks=1          
@@ -6,19 +6,20 @@
 #SBATCH --mem-per-cpu=4G
 #SBATCH --output=/home/%u/rstudio-server.job.%j.out
 #SBATCH --error=/home/%u/rstudio-server.job.%j.err
-# customize --output path as appropriate (to a directory readable only by the user!)
 
-# Create temporary directory to be populated with directories to bind-mount in the container
-# where writable file systems are necessary. Adjust path as appropriate for your computing environment.
+module purge
+module load Apptainer
 
 # Select a more secure password if desired
 export APPTAINERENV_PASSWORD="gizmo_rstudio" # $(openssl rand -base64 15)
-export IMAGE_NAME="rstudio-server-FHIL.sif"
 
-export FILE_BASE="/fh/fast/_IRC/FHIL/grp/inhouse_computational_resources/rstudio-server-launcher"
-# Found in $FILE_BASE/images/
+## Container image path - local SIF file or GHCR image
+## local
+# export IMAGE_PATH="/fh/fast/_IRC/FHIL/grp/inhouse_computational_resources/rstudio-server-launcher/images/rstudio-server-FHIL.sif"
+## or use apptainer pull to download the image from GHCR
+## use 'ORAS' protocol for SIFs, and 'docker' for Docker images
+export IMAGE_PATH="oras://ghcr.io/fred-hutch-innovation-lab/rstudio-server-launcher:latest"
 
-export USER_FILE_BASE="${FILE_BASE}/user/${USER}"
 workdir=$(mktemp -d)
 export APPTAINERENV_USER=$(id -un)
 
@@ -28,11 +29,11 @@ export APPTAINERENV_USER=$(id -un)
 
 cat > ${workdir}/rsession.sh <<"END"
 #!/bin/sh
-export R_LIBS_USER=${USER_FILE_BASE}/R/${IMAGE_NAME}
-mkdir -p "${R_LIBS_USER}"
+# export R_LIBS_USER=/fh/fast/_IRC/FHIL/grp/inhouse_computational_resources/rstudio-server-launcher/users/${USER}/R/${IMAGE_NAME}
+# mkdir -p "${R_LIBS_USER}"
 ## custom Rprofile & Renviron (default is $HOME/.Rprofile and $HOME/.Renviron)
-export R_PROFILE_USER=$USER_FILE_BASE/.Rprofile ## comment these out if you don't have these files
-export R_ENVIRON_USER=$USER_FILE_BASE/.Renviron
+export R_PROFILE_USER=/fh/fast/_IRC/FHIL/grp/inhouse_computational_resources/rstudio-server-launcher/users/${USER}/.Rprofile ## comment these out if you don't have these files
+export R_ENVIRON_USER=/fh/fast/_IRC/FHIL/grp/inhouse_computational_resources/rstudio-server-launcher/users/${USER}/.Renviron
 exec /usr/lib/rstudio-server/bin/rsession "${@}"
 END
 
@@ -47,9 +48,12 @@ export APPTAINERENV_RSTUDIO_SESSION_TIMEOUT=0
 
 # Get an available port
 export PORT=$(fhfreeport)
-# ${APPTAINERENV_PASSWORD}
-cat 1>&2 <<END
+
+cat 2>&1 <<END
 RStudio Server is starting up...
+
+Container Information:
+- Image: ${IMAGE_PATH}
 
 Connection Information:
 - URL: http://$(hostname).fhcrc.org:${PORT}
@@ -65,12 +69,18 @@ When done using RStudio Server, terminate the job by:
 2. Issue the following command on the login node:
 
       scancel -f ${SLURM_JOB_ID}
+
+Note that if the server is not available despite the job running, it may be because
+the image is being downloaded. Check the error log to see if it's still pulling.
 END
 
-singularity exec --cleanenv \
+# Launch RStudio Server with Apptainer
+apptainer exec --cleanenv \
                  --scratch /run,/var/lib/rstudio-server \
                  --workdir $(mktemp -d) \
-                 ${FILE_BASE}/images/${IMAGE_NAME} \
+                 --bind /home:/home \
+                 --bind /fh:/fh \
+                 ${IMAGE_PATH} \
    rserver --www-address=$(hostname) \
            --www-port $PORT \
            --auth-none=0 \

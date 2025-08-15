@@ -1,0 +1,43 @@
+name: Apptainer build deploy
+
+on:
+  push:
+    tags:
+      - '*.*.*'   # Runs only for version tags like v1.2.3
+
+jobs:
+  build-test-containers:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        singularity_version: ['v4.3.1']
+    container:
+      image: quay.io/singularity/singularity:v${{ matrix.singularity_version }}
+      options: --privileged
+
+    steps:
+      - name: Check out code for the container builds
+        uses: actions/checkout@v2
+
+      - name: Build Container
+        env:
+          recipe: images/rstudio-server-FHIL.def
+        run: |
+          ls
+          if [ -f "${{ env.recipe }}" ]; then
+            sudo -E singularity build container.sif ${{ env.recipe }}
+            tag=$(echo "${GITHUB_REF#refs/tags/}")
+            echo "Tag is $tag."
+            echo "tag=$tag" >> $GITHUB_ENV
+          else
+            echo "${{ env.recipe }} is not found."
+            echo "Present working directory: $PWD"
+            ls
+            exit 1
+          fi
+
+      - name: Login and Deploy Container
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | singularity remote login -u ${{ secrets.GHCR_USERNAME }} --password-stdin oras://ghcr.io
+          singularity push container.sif oras://ghcr.io/${GITHUB_REPOSITORY}:${tag}
