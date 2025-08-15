@@ -1,0 +1,60 @@
+Bootstrap: docker
+From: rocker/tidyverse:4.4.3
+
+%post
+# rstudio_FHIL.4.4.3.dockerfile
+# 
+# This Dockerfile extends the rocker/tidyverse:4.4.3 base image to create a
+# customized R environment for FHIL computational workflows.
+# Base image includes: R, tidyverse packages, and common data science tools
+
+# Set environment variables for R package installation
+R_PACKAGES_DIR=/usr/local/lib/R/site-library
+R_PACKAGE_CACHE=/tmp/R-packages
+
+# Create package cache directory
+mkdir -p ${R_PACKAGE_CACHE}
+
+# Install system dependencies
+# Add any additional system libraries you need here
+apt-get update \
+&& apt-get install -y --no-install-recommends \
+    rolldice \
+&& rm -rf /var/lib/apt/lists/*
+
+# Install essential R packages
+# Add any additional R packages you need here
+
+# Optional: Install additional R packages from CRAN
+# RUN R -q -e 'install.packages(c("package1", "package2"), repos="https://cran.rstudio.com/", lib="${R_PACKAGES_DIR}")'
+
+# Optional: Install packages from Bioconductor
+# RUN R -q -e 'if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager", repos="https://cran.rstudio.com/", lib="${R_PACKAGES_DIR}")'
+# RUN R -q -e 'BiocManager::install(c("package1", "package2"), lib="${R_PACKAGES_DIR}")'
+
+# Optional: Install packages from GitHub
+# RUN R -q -e 'if (!require("remotes", quietly = TRUE)) install.packages("remotes", repos="https://cran.rstudio.com/", lib="${R_PACKAGES_DIR}")'
+# RUN R -q -e 'remotes::install_github("username/repo", lib="${R_PACKAGES_DIR}")'
+
+# Clean up package cache
+rm -rf ${R_PACKAGE_CACHE}
+
+# Set working directory
+mkdir -p /home/rstudio
+cd /home/rstudio
+
+# Expose RStudio Server port (if running as server)
+# EXPOSE 8787
+
+# Default command (can be overridden)
+%environment
+export R_PACKAGES_DIR=/usr/local/lib/R/site-library
+export R_PACKAGE_CACHE=/tmp/R-packages
+
+%runscript
+cd /home/rstudio
+exec /bin/bash R "$@"
+
+%startscript
+cd /home/rstudio
+exec /bin/bash R "$@"
