@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=rstudio-server
-#SBATCH --time=4-00:00:00   # days-hours:minutes:seconds
+#SBATCH --time=5-00:00:00   # days-hours:minutes:seconds
 #SBATCH --ntasks=1          
-#SBATCH --cpus-per-task=2   # per sciwiki, use CPUs to inform mem. 1 CPU = 4 Gb
+#SBATCH --cpus-per-task=8   # per sciwiki, use CPUs to inform mem. 1 CPU = 4 Gb
 #SBATCH --mem-per-cpu=4G
-#SBATCH --output=/home/%u/rstudio-server.job.%j.out
-#SBATCH --error=/home/%u/rstudio-server.job.%j.err
+#SBATCH --output=rstudio-server.job.out
+#SBATCH --error=rstudio-server.job.err
 
 module purge
 module load Apptainer
@@ -18,7 +18,7 @@ export APPTAINERENV_PASSWORD="gizmo_rstudio" # $(openssl rand -base64 15)
 # export IMAGE_PATH="/fh/fast/_IRC/FHIL/grp/inhouse_computational_resources/rstudio-server-launcher/images/rstudio-server-FHIL.sif"
 ## or use apptainer pull to download the image from GHCR
 ## use 'ORAS' protocol for SIFs, and 'docker' for Docker images
-export IMAGE_PATH="oras://ghcr.io/fred-hutch-innovation-lab/rstudio-server-launcher:latest"
+export IMAGE_PATH="oras://ghcr.io/fred-hutch-innovation-lab/rstudio-server-launcher:0.0.3"
 
 workdir=$(mktemp -d)
 export APPTAINERENV_USER=$(id -un)
